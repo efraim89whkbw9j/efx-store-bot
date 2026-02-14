@@ -1,12 +1,7 @@
 // ============================================
-// WHATSAPP BOT + SITE EFX STORE - ARQUIVO ÚNICO (BACKEND)
+// WHATSAPP BOT VENDEDOR VIRTUAL + SITE EFX STORE
 // ============================================
-const express = require("express");
-const app = express();
 
-app.get("/", (req, res) => {
-  res.send("EFX Store Bot está online 🚀");
-});
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const express = require('express');
@@ -20,7 +15,7 @@ const multer = require('multer');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-const PORT = PORT;
+const PORT = process.env.PORT || 3000; // Porta via ambiente ou 3000
 
 // Configuração do multer para upload de arquivos
 const storage = multer.diskStorage({
@@ -194,7 +189,7 @@ async function processMessage(sock, msg) {
     
     // Entrega?
     if (lowerText.includes('entrega') || lowerText.includes('prazo')) {
-        await sock.sendMessage(sender, { text: "🚚 *ENTREGA*\n\nPrazo: 2-3 dias úteis\nTaxa: 500kz (ou grátis para compras acima de 20.000)\nEntregamos em toda cidade!" });
+        await sock.sendMessage(sender, { text: "🚚 *ENTREGA*\n\nPrazo: 2-3 dias úteis\nTaxa: R$ 5,00 (ou grátis acima de R$ 200)\nEntregamos em toda cidade!" });
         return;
     }
     
@@ -288,14 +283,15 @@ Obrigado pela compra! 🎉
 
 // ========== ROTAS DA API ==========
 app.use(express.json());
+app.use(express.static(path.join(__dirname)));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Servir o frontend (index.html) para todas as rotas não-API
-app.get(['/', '/admin'], (req, res) => {
+// Rota para a página inicial da loja
+app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// ===== ROTAS DE PRODUTOS =====
+// ===== ROTAS DE PRODUTOS (com proteção por senha) =====
 app.get('/api/produtos', (req, res) => {
     const db = readDB();
     res.json(db.produtos);
@@ -388,7 +384,7 @@ app.post('/api/loja', (req, res) => {
 
 app.post('/api/upload/logo', upload.single('logo'), (req, res) => {
     const senha = req.headers['x-admin-senha'];
-    if (senha !== 'efraim321') {
+    if (senha !== 'admin123') {
         return res.status(401).json({ erro: 'Não autorizado' });
     }
     if (!req.file) {
@@ -402,8 +398,16 @@ app.post('/api/upload/logo', upload.single('logo'), (req, res) => {
 });
 
 // ========== INICIAR SERVIDOR ==========
- const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("Servidor HTTP rodando na porta", PORT);
+server.listen(PORT, () => {
+    console.log(`
+    ========================================
+    🚀 EFX STORE - WHATSAPP BOT + SITE
+    ========================================
+    📱 Site da Loja: http://localhost:${PORT}/
+    📊 Painel Admin: http://localhost:${PORT}/admin.html
+    🔌 API: http://localhost:${PORT}/api
+    ========================================
+    `);
 });
+
+connectToWhatsApp();
