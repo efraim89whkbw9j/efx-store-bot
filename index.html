@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EFX Store</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #000000;
+            color: #ffffff;
+        }
+
+        /* Cores da paleta */
+        :root {
+            --preto: #000000;
+            --azul-claro: #00D4FF;
+            --roxo: #8A2BE2;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header com gradiente roxo e azul */
+        .header {
+            background: linear-gradient(135deg, var(--roxo), var(--azul-claro));
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,212,255,0.3);
+        }
+
+        /* Botões com estilo */
+        button {
+            background: var(--roxo);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            margin-right: 10px;
+            transition: 0.3s;
+            border: 1px solid var(--azul-claro);
+        }
+
+        button:hover {
+            background: var(--azul-claro);
+            color: var(--preto);
+        }
+
+        button.danger {
+            background: #dc3545;
+            border-color: #ff0000;
+        }
+
+        /* Cards de produtos */
+        .produtos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .produto-card {
+            background: #111;
+            border: 1px solid var(--azul-claro);
+            border-radius: 10px;
+            padding: 15px;
+            transition: 0.3s;
+            color: #fff;
+        }
+
+        .produto-card:hover {
+            box-shadow: 0 0 15px var(--azul-claro);
+            transform: scale(1.02);
+        }
+
+        .produto-card h3 {
+            color: var(--azul-claro);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+
+        .disponivel { background: #28a745; color: white; }
+        .esgotado { background: #dc3545; color: white; }
+
+        /* Status do WhatsApp */
+        .status-card {
+            background: #111;
+            border: 1px solid var(--azul-claro);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        #qr-container {
+            width: 200px;
+            height: 200px;
+            background: #fff;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #status-indicator {
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .conectado { background: #28a745; color: white; }
+        .desconectado { background: #dc3545; color: white; }
+
+        /* Abas do admin */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            background: #111;
+            color: var(--azul-claro);
+            border: 1px solid var(--roxo);
+        }
+
+        .tab-btn.active {
+            background: var(--roxo);
+            color: white;
+            border-color: var(--azul-claro);
+        }
+
+        .tab-content {
+            display: none;
+            background: #111;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid var(--azul-claro);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Formulários */
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            border: 1px solid var(--azul-claro);
+            border-radius: 5px;
+            background: #000;
+            color: #fff;
+        }
+
+        label {
+            color: var(--azul-claro);
+            font-weight: bold;
+        }
+
+        /* Pedidos */
+        .pedidos-lista {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .pedido-item {
+            background: #111;
+            border-left: 4px solid var(--roxo);
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid var(--azul-claro);
+        }
+
+        /* Logo preview */
+        #logo-preview img {
+            max-width: 200px;
+            max-height: 100px;
+            border: 2px solid var(--azul-claro);
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <!-- Conteúdo será preenchido via JavaScript -->
+    </div>
+
+    <script>
+        // Detectar se é admin ou cliente
+        const isAdmin = window.location.pathname === '/admin';
+        const ADMIN_SENHA = 'admin123'; // Você pode alterar aqui
+
+        // Elemento principal
+        const app = document.getElementById('app');
+
+        // Socket.io para QR Code
+        const socket = io();
+
+        // Dados
+        let produtos = [];
+        let pedidos = [];
+        let configuracoes = { loja: {}, mensagens: {}, pagamentos: [] };
+
+        // Inicializar
+        async function init() {
+            if (isAdmin) {
+                renderAdmin();
+                carregarProdutos();
+                carregarPedidos();
+                carregarConfiguracoes();
+                carregarLoja();
+                setupSocket();
+            } else {
+                renderLoja();
+                carregarProdutosLoja();
+                carregarInfoLoja();
+            }
+        }
+
+        // ========== SOCKET (admin) ==========
+        function setupSocket() {
+            socket.on('qr', (qr) => {
+                const canvas = document.getElementById('qr-canvas');
+                if (canvas) {
+                    QRCode.toCanvas(canvas, qr, { width: 180 }, (err) => {
+                        if (err) console.error(err);
+                    });
+                }
+            });
+
+            socket.on('status', (status) => {
+                const indicator = document.getElementById('status-indicator');
+                if (indicator) {
+                    indicator.className = status;
+                    indicator.textContent = status === 'conectado' ? '✅ Conectado' : '❌ Desconectado';
+                }
+            });
+
+            socket.on('novo_pedido', () => {
+                carregarPedidos();
+                alert('Novo pedido recebido!');
+            });
+        }
+
+        // ========== RENDERIZAÇÃO ==========
+        function renderLoja() {
+            app.innerHTML = `
+                <div class="header">
+                    <h1 id="loja-nome-display">EFX Store</h1>
+                    <p id="loja-descricao-display">Bem-vindo à nossa loja!</p>
+                </div>
+                <div id="produtos-loja" class="produtos-grid">
+                    Carregando produtos...
+                </div>
+            `;
+        }
+
+        function renderAdmin() {
+            app.innerHTML = `
+                <div class="header">
+                    <h1>🤖 EFX Store - Painel Admin</h1>
+                    <p>Gerencie seu bot e a loja</p>
+                </div>
+
+                <!-- Status e QR Code -->
+                <div class="status-card">
+                    <div id="qr-container">
+                        <canvas id="qr-canvas"></canvas>
+                    </div>
+                    <div>
+                        <h3>Status da Conexão WhatsApp:</h3>
+                        <div id="status-indicator" class="desconectado">Desconectado</div>
+                        <p style="margin-top: 10px;">Escaneie o QR Code com o WhatsApp Business</p>
+                    </div>
+                </div>
+
+                <!-- Abas -->
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="showTab('produtos')">📦 Produtos</button>
+                    <button class="tab-btn" onclick="showTab('pedidos')">📋 Pedidos</button>
+                    <button class="tab-btn" onclick="showTab('configuracoes')">⚙️ Bot</button>
+                    <button class="tab-btn" onclick="showTab('loja')">🏪 Loja</button>
+                </div>
+
+                <!-- Aba Produtos -->
+                <div id="tab-produtos" class="tab-content active">
+                    <h2>Gerenciar Produtos</h2>
+                    <div class="produto-form" style="background: #000; border:1px solid var(--azul-claro); padding:15px;">
+                        <h3>Adicionar Novo Produto</h3>
+                        <input type="text" id="produto-nome" placeholder="Nome">
+                        <input type="number" id="produto-preco" placeholder="Preço">
+                        <textarea id="produto-descricao" placeholder="Descrição" rows="3"></textarea>
+                        <input type="text" id="produto-categoria" placeholder="Categoria">
+                        <select id="produto-status">
+                            <option value="disponivel">Disponível</option>
+                            <option value="esgotado">Esgotado</option>
+                        </select>
+                        <input type="text" id="produto-imagem" placeholder="URL da imagem (opcional)">
+                        <button onclick="adicionarProduto()">Adicionar</button>
+                    </div>
+                    <div id="produtos-lista" class="produtos-grid"></div>
+                </div>
+
+                <!-- Aba Pedidos -->
+                <div id="tab-pedidos" class="tab-content">
+                    <h2>Pedidos Recebidos</h2>
+                    <div id="pedidos-lista" class="pedidos-lista"></div>
+                </div>
+
+                <!-- Aba Configurações do Bot -->
+                <div id="tab-configuracoes" class="tab-content">
+                    <h2>Configurações do Bot</h2>
+                    <div class="config-section" style="background:#000; border:1px solid var(--azul-claro); padding:15px;">
+                        <h3>Mensagens Automáticas</h3>
+                        <label>Saudação:</label>
+                        <textarea id="msg-saudacao" rows="2"></textarea>
+                        <label>Fallback:</label>
+                        <textarea id="msg-fallback" rows="2"></textarea>
+                        <label>Header Catálogo:</label>
+                        <input type="text" id="msg-catalogo-header">
+                        <label>Footer Catálogo:</label>
+                        <input type="text" id="msg-catalogo-footer">
+                    </div>
+                    <div class="config-section" style="background:#000; border:1px solid var(--azul-claro); padding:15px;">
+                        <h3>Métodos de Pagamento</h3>
+                        <div id="pagamentos-lista"></div>
+                        <button onclick="adicionarPagamento()">+ Adicionar Pagamento</button>
+                    </div>
+                    <button onclick="salvarConfiguracoes()">💾 Salvar Configurações do Bot</button>
+                </div>
+
+                <!-- Aba Loja -->
+                <div id="tab-loja" class="tab-content">
+                    <h2>Configurações da Loja</h2>
+                    <div class="config-section" style="background:#000; border:1px solid var(--azul-claro); padding:15px;">
+                        <h3>Informações da Loja</h3>
+                        <label>Nome da Loja:</label>
+                        <input type="text" id="loja-nome">
+                        <label>Descrição:</label>
+                        <textarea id="loja-descricao" rows="2"></textarea>
+                        <label>WhatsApp (código do país + número, ex: 5511999999999):</label>
+                        <input type="text" id="loja-whatsapp">
+                        <h3>Logo da Loja</h3>
+                        <div id="logo-preview">
+                            <img id="logo-img-preview" src="" style="max-width:200px; max-height:100px; display:none;">
+                        </div>
+                        <input type="file" id="logo-upload" accept="image/*">
+                        <button onclick="uploadLogo()">Enviar Logo</button>
+                    </div>
+                    <button onclick="salvarLoja()">💾 Salvar Configurações da Loja</button>
+                </div>
+            `;
+        }
+
+        // ========== FUNÇÕES DA LOJA ==========
+        async function carregarProdutosLoja() {
+            const res = await fetch('/api/produtos');
+            produtos = await res.json();
+            const disponiveis = produtos.filter(p => p.status === 'disponivel');
+            const container = document.getElementById('produtos-loja');
+            if (!container) return;
+            if (disponiveis.length === 0) {
+                container.innerHTML = '<p>Nenhum produto disponível no momento.</p>';
+                return;
+            }
+            container.innerHTML = disponiveis.map(p => `
+                <div class="produto-card">
+                    <h3>${p.nome}</h3>
+                    <p><strong>R$ ${p.preco}</strong></p>
+                    <p>${p.descricao}</p>
+                    ${p.imagem ? `<img src="${p.imagem}" style="max-width:100%; height:150px; object-fit:cover; border-radius:5px;">` : ''}
+                    <button onclick="comprar('${p.nome}')" style="margin-top:10px; width:100%; background:var(--roxo);">Comprar via WhatsApp</button>
+                </div>
+            `).join('');
+        }
+
+        async function carregarInfoLoja() {
+            const res = await fetch('/api/loja');
+            const loja = await res.json();
+            const nomeEl = document.getElementById('loja-nome-display');
+            const descEl = document.getElementById('loja-descricao-display');
+            if (nomeEl) nomeEl.textContent = loja.nome || 'EFX Store';
+            if (descEl) descEl.textContent = loja.descricao || 'Bem-vindo à nossa loja!';
+        }
+
+        function comprar(nomeProduto) {
+            fetch('/api/loja')
+                .then(res => res.json())
+                .then(loja => {
+                    const whatsapp = loja.whatsapp || '5511999999999';
+                    const mensagem = encodeURIComponent(`Olá! Gostaria de comprar o produto: ${nomeProduto}`);
+                    window.open(`https://wa.me/${whatsapp}?text=${mensagem}`, '_blank');
+                });
+        }
+
+        // ========== FUNÇÕES DO ADMIN ==========
+        window.showTab = function(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.querySelector(`.tab-btn[onclick="showTab('${tab}')"]`).classList.add('active');
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            if (tab === 'produtos') carregarProdutos();
+            if (tab === 'pedidos') carregarPedidos();
+            if (tab === 'configuracoes') carregarConfiguracoes();
+            if (tab === 'loja') carregarLoja();
+        };
+
+        async function carregarProdutos() {
+            const res = await fetch('/api/produtos');
+            produtos = await res.json();
+            const lista = document.getElementById('produtos-lista');
+            if (!lista) return;
+            lista.innerHTML = produtos.map(p => `
+                <div class="produto-card">
+                    <h3>${p.nome}</h3>
+                    <div class="badge ${p.status}">${p.status === 'disponivel' ? '✅ Disponível' : '❌ Esgotado'}</div>
+                    <p><strong>Preço:</strong> R$ ${p.preco}</p>
+                    <p><strong>Categoria:</strong> ${p.categoria || 'N/A'}</p>
+                    <p>${p.descricao}</p>
+                    ${p.imagem ? `<img src="${p.imagem}" style="max-width:100%; height:100px; object-fit:cover;">` : ''}
+                    <div style="margin-top:10px;">
+                        <button onclick="editarProduto(${p.id})">✏️ Editar</button>
+                        <button class="danger" onclick="deletarProduto(${p.id})">🗑️ Remover</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.adicionarProduto = async function() {
+            const produto = {
+                nome: document.getElementById('produto-nome').value,
+                preco: parseFloat(document.getElementById('produto-preco').value),
+                descricao: document.getElementById('produto-descricao').value,
+                categoria: document.getElementById('produto-categoria').value,
+                status: document.getElementById('produto-status').value,
+                imagem: document.getElementById('produto-imagem').value
+            };
+            const res = await fetch('/api/produtos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-senha': ADMIN_SENHA },
+                body: JSON.stringify(produto)
+            });
+            if (res.ok) {
+                document.getElementById('produto-nome').value = '';
+                document.getElementById('produto-preco').value = '';
+                document.getElementById('produto-descricao').value = '';
+                document.getElementById('produto-categoria').value = '';
+                document.getElementById('produto-imagem').value = '';
+                carregarProdutos();
+            } else alert('Erro ao adicionar produto. Verifique a senha.');
+        };
+
+        window.deletarProduto = async function(id) {
+            if (!confirm('Remover produto?')) return;
+            const res = await fetch(`/api/produtos/${id}`, { 
+                method: 'DELETE',
+                headers: { 'x-admin-senha': ADMIN_SENHA }
+            });
+            if (res.ok) carregarProdutos();
+            else alert('Erro ao deletar.');
+        };
+
+        async function carregarPedidos() {
+            const res = await fetch('/api/pedidos');
+            pedidos = await res.json();
+            const lista = document.getElementById('pedidos-lista');
+            if (!lista) return;
+            lista.innerHTML = pedidos.map(p => `
+                <div class="pedido-item">
+                    <h3>Pedido #${p.id}</h3>
+                    <p><strong>Cliente:</strong> ${p.cliente} (${p.telefone})</p>
+                    <p><strong>Produto:</strong> ${p.produto.nome} - R$ ${p.produto.preco}</p>
+                    <p><strong>Endereço:</strong> ${p.endereco}</p>
+                    <p><strong>Pagamento:</strong> ${p.pagamento}</p>
+                    <p><strong>Data:</strong> ${p.data}</p>
+                    <p><strong>Status:</strong> ${p.status}</p>
+                </div>
+            `).join('');
+        }
+
+        async function carregarConfiguracoes() {
+            const res = await fetch('/api/configuracoes');
+            configuracoes = await res.json();
+            document.getElementById('msg-saudacao').value = configuracoes.mensagens?.saudacao || '';
+            document.getElementById('msg-fallback').value = configuracoes.mensagens?.fallback || '';
+            document.getElementById('msg-catalogo-header').value = configuracoes.mensagens?.catalogo_header || '';
+            document.getElementById('msg-catalogo-footer').value = configuracoes.mensagens?.catalogo_footer || '';
+            const pagamentosLista = document.getElementById('pagamentos-lista');
+            if (pagamentosLista) {
+                pagamentosLista.innerHTML = (configuracoes.pagamentos || []).map((p, i) => `
+                    <div style="margin-bottom:15px; padding:10px; background:#000; border:1px solid var(--azul-claro);">
+                        <input type="text" value="${p.nome}" placeholder="Nome" onchange="atualizarPagamento(${i}, 'nome', this.value)">
+                        <textarea placeholder="Instruções" onchange="atualizarPagamento(${i}, 'instrucoes', this.value)" rows="2">${p.instrucoes}</textarea>
+                        <label><input type="checkbox" ${p.ativo ? 'checked' : ''} onchange="atualizarPagamento(${i}, 'ativo', this.checked)"> Ativo</label>
+                        <button class="danger" onclick="removerPagamento(${i})">Remover</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        window.atualizarPagamento = function(index, campo, valor) {
+            configuracoes.pagamentos[index][campo] = valor;
+        };
+
+        window.adicionarPagamento = function() {
+            if (!configuracoes.pagamentos) configuracoes.pagamentos = [];
+            configuracoes.pagamentos.push({ nome: 'Novo', ativo: true, instrucoes: '' });
+            carregarConfiguracoes();
+        };
+
+        window.removerPagamento = function(index) {
+            configuracoes.pagamentos.splice(index, 1);
+            carregarConfiguracoes();
+        };
+
+        window.salvarConfiguracoes = async function() {
+            configuracoes.mensagens = {
+                saudacao: document.getElementById('msg-saudacao').value,
+                fallback: document.getElementById('msg-fallback').value,
+                catalogo_header: document.getElementById('msg-catalogo-header').value,
+                catalogo_footer: document.getElementById('msg-catalogo-footer').value
+            };
+            const res = await fetch('/api/configuracoes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-senha': ADMIN_SENHA },
+                body: JSON.stringify(configuracoes)
+            });
+            if (res.ok) alert('Configurações salvas!');
+            else alert('Erro ao salvar.');
+        };
+
+        async function carregarLoja() {
+            const res = await fetch('/api/loja');
+            const loja = await res.json();
+            document.getElementById('loja-nome').value = loja.nome || '';
+            document.getElementById('loja-descricao').value = loja.descricao || '';
+            document.getElementById('loja-whatsapp').value = loja.whatsapp || '';
+            if (loja.logo) {
+                const preview = document.getElementById('logo-img-preview');
+                preview.src = loja.logo;
+                preview.style.display = 'block';
+            }
+        }
+
+        window.salvarLoja = async function() {
+            const loja = {
+                nome: document.getElementById('loja-nome').value,
+                descricao: document.getElementById('loja-descricao').value,
+                whatsapp: document.getElementById('loja-whatsapp').value
+            };
+            const res = await fetch('/api/loja', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-senha': ADMIN_SENHA },
+                body: JSON.stringify(loja)
+            });
+            if (res.ok) alert('Configurações da loja salvas!');
+            else alert('Erro ao salvar.');
+        };
+
+        window.uploadLogo = async function() {
+            const fileInput = document.getElementById('logo-upload');
+            if (!fileInput.files.length) return alert('Selecione uma imagem.');
+            const formData = new FormData();
+            formData.append('logo', fileInput.files[0]);
+            const res = await fetch('/api/upload/logo', {
+                method: 'POST',
+                headers: { 'x-admin-senha': ADMIN_SENHA },
+                body: formData
+            });
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('logo-img-preview').src = data.logo;
+                document.getElementById('logo-img-preview').style.display = 'block';
+                alert('Logo enviada!');
+            } else alert('Erro no upload.');
+        };
+
+        // Iniciar
+        init();
+    </script>
+</body>
+</html>
