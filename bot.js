@@ -15,7 +15,7 @@ const multer = require('multer');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-const PORT = 3000;
+const PORT = PORT;
 
 // Configuração do multer para upload de arquivos
 const storage = multer.diskStorage({
@@ -46,15 +46,15 @@ if (!fs.existsSync(DB_FILE)) {
                 catalogo_footer: "\n\nPara comprar, digite *comprar [nome do produto]*"
             },
             pagamentos: [
-                { nome: "Transferência Bancária", ativo: true, instrucoes: "Banco: BAI | IBAN: AO060000123456789" },
-                { nome: "Multicaixa Express", ativo: true, instrucoes: "Número: 923456789" },
+                { nome: "Transferência Bancária", ativo: true, instrucoes: "Banco: BAI | IBAN: A0040 0000 61283833101 84" },
+                { nome: "Multicaixa Express", ativo: true, instrucoes: "Número: 945935734" },
                 { nome: "Pagar na Entrega", ativo: true, instrucoes: "Pagamento em cash no momento da entrega" }
             ],
             loja: {
                 nome: "EFX Store",
                 logo: "",
                 descricao: "Bem-vindo à nossa loja!",
-                whatsapp: "5511999999999"
+                whatsapp: "954312173"
             }
         }
     }, null, 2));
@@ -189,7 +189,7 @@ async function processMessage(sock, msg) {
     
     // Entrega?
     if (lowerText.includes('entrega') || lowerText.includes('prazo')) {
-        await sock.sendMessage(sender, { text: "🚚 *ENTREGA*\n\nPrazo: 2-3 dias úteis\nTaxa: R$ 5,00 (ou grátis acima de R$ 200)\nEntregamos em toda cidade!" });
+        await sock.sendMessage(sender, { text: "🚚 *ENTREGA*\n\nPrazo: 2-3 dias úteis\nTaxa: 500kz (ou grátis para compras acima de 20.000)\nEntregamos em toda cidade!" });
         return;
     }
     
