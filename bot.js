@@ -1,7 +1,12 @@
 // ============================================
 // WHATSAPP BOT + SITE EFX STORE - ARQUIVO ÚNICO (BACKEND)
 // ============================================
+const express = require("express");
+const app = express();
 
+app.get("/", (req, res) => {
+  res.send("EFX Store Bot está online 🚀");
+});
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const express = require('express');
@@ -397,15 +402,8 @@ app.post('/api/upload/logo', upload.single('logo'), (req, res) => {
 });
 
 // ========== INICIAR SERVIDOR ==========
-const PORT = process.env.PORT || 3000; // Esta linha é a chave!
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`
-    ========================================
-    🚀 EFX STORE - Rodando no Render
-    ========================================
-    📱 Porta: ${PORT}
-    ========================================
-    `);
-});
+ const PORT = process.env.PORT || 3000;
 
-connectToWhatsApp();
+app.listen(PORT, () => {
+  console.log("Servidor HTTP rodando na porta", PORT);
+});
